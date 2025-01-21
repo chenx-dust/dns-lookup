@@ -3,9 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+from uvicorn.protocols.utils import get_remote_addr, get_client_addr
 from pydantic import BaseModel
-import dns.resolver
-import dns.rdatatype
 import socket
 import requests
 from typing import Optional
@@ -30,18 +30,19 @@ app.add_middleware(
     allowed_hosts=["*"]  # 在生产环境中应该设置具体的域名
 )
 
-class DNSResponse(BaseModel):
-    Status: int = 0
-    TC: bool = False
-    RD: bool = True
-    RA: bool = True
-    AD: bool = False
-    CD: bool = False
-    Question: list = []
-    Answer: Optional[list] = None
-    Authority: Optional[list] = None
-    Comment: Optional[str] = None
-    edns_client_subnet: Optional[str] = None
+# 添加代理头中间件
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
+# 添加 PROXY Protocol 支持的中间件
+@app.middleware("http")
+async def proxy_protocol_middleware(request: Request, call_next):
+    # 尝试从 PROXY Protocol 获取客户端信息
+    client = request.scope.get("client")
+    if client:
+        request.scope["client"] = client
+    
+    response = await call_next(request)
+    return response
 
 def get_client_ip(request: Request = None):
     try:
@@ -75,88 +76,15 @@ async def get_ip(request: Request):
 @api_app.get("/resolve")
 async def resolve_dns(name: str, type: str = "A", edns_client_subnet: str = None):
     try:
-        # 创建解析器
-        resolver = dns.resolver.Resolver()
-        
-        # 设置 Google DNS 服务器作为上游服务器
-        resolver.nameservers = ['8.8.8.8', '8.8.4.4']
-        
-        # 获取记录类型
-        try:
-            if type == "255" or type == "ALL":
-                rdtype = "ANY"
-            else:
-                rdtype = type
-            rdtype = dns.rdatatype.from_text(rdtype)
-        except Exception:
-            raise HTTPException(status_code=400, detail=f"Invalid record type: {type}")
-
-        # 处理 ECS
-        if edns_client_subnet and edns_client_subnet.lower() != "undefined":
-            try:
-                # 验证 ECS 格式
-                if '/' not in edns_client_subnet:
-                    edns_client_subnet = f"{edns_client_subnet}/24"
-                ip, mask = edns_client_subnet.split('/')
-                # TODO: 这里可以添加更多的 IP 格式验证
-            except Exception:
-                raise HTTPException(status_code=400, detail=f"Invalid ECS format: {edns_client_subnet}")
-            
-            # 设置 EDNS 选项
-            options = []
-            from dns.edns import ECSOption
-            try:
-                options.append(ECSOption.from_text(edns_client_subnet))
-                resolver.use_edns(0, options=options)
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Invalid ECS: {str(e)}")
-
-        # 执行查询
-        try:
-            answers = resolver.resolve(name, rdtype)
-        except dns.resolver.NXDOMAIN:
-            return DNSResponse(
-                Status=3,
-                Question=[{"name": name, "type": rdtype}],
-                Comment="Domain does not exist"
-            )
-        except dns.resolver.NoAnswer:
-            return DNSResponse(
-                Status=0,
-                Question=[{"name": name, "type": rdtype}],
-                Comment="No records found"
-            )
-        except Exception as e:
-            return DNSResponse(
-                Status=2,
-                Question=[{"name": name, "type": rdtype}],
-                Comment=str(e)
-            )
-
-        # 构建响应
-        response = DNSResponse(
-            Question=[{
-                "name": name,
-                "type": rdtype
-            }]
-        )
-
-        # 添加应答记录
-        response.Answer = []
-        for rdata in answers:
-            response.Answer.append({
-                "name": name,
-                "type": rdtype,
-                "TTL": answers.ttl,
-                "data": str(rdata)
-            })
-
-        # 如果提供了有效的 ECS，添加到响应中
-        if edns_client_subnet and edns_client_subnet.lower() != "undefined":
-            response.edns_client_subnet = edns_client_subnet
-
-        return response
-
+        # 构建 Google DNS-over-HTTPS 请求
+        url = "https://dns.google/resolve"
+        params = {
+            "name": name,
+            "type": type,
+            "edns_client_subnet": edns_client_subnet
+        }
+        response = requests.get(url, params=params)
+        return response.json()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
