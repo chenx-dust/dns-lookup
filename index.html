@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNS 查询工具</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">DNS 查询工具</h1>
+        <form id="dnsForm" class="mb-4">
+            <div class="mb-3">
+                <label for="domain" class="form-label">域名</label>
+                <input type="text" class="form-control" id="domain" required placeholder="例如: example.com">
+            </div>
+            <div class="mb-3">
+                <label for="queryType" class="form-label">查询类型</label>
+                <select class="form-select" id="queryType">
+                    <option value="ALL">ALL (所有记录)</option>
+                    <option value="A">A (IPv4地址)</option>
+                    <option value="AAAA">AAAA (IPv6地址)</option>
+                    <option value="CNAME">CNAME (规范名称)</option>
+                    <option value="MX">MX (邮件交换)</option>
+                    <option value="TXT">TXT (文本记录)</option>
+                    <option value="NS">NS (域名服务器)</option>
+                    <option value="SOA">SOA (起始授权机构)</option>
+                    <option value="PTR">PTR (反向域名)</option>
+                    <option value="SRV">SRV (服务记录)</option>
+                    <option value="CAA">CAA (证书颁发机构授权)</option>
+                    <option value="LOC">LOC (地理位置)</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">EDNS Client Subnet (ECS)</label>
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="customEcs" placeholder="自定义 ECS (例如: 1.2.3.4/24)">
+                    <button class="btn btn-outline-secondary" type="button" id="getMyIp">
+                        <span class="spinner-border spinner-border-sm d-none" id="ipSpinner" role="status" aria-hidden="true"></span>
+                        获取本机IP
+                    </button>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">查询</button>
+        </form>
+
+        <div class="mb-3">
+            <h4>查询结果</h4>
+            <div class="result-area" id="queryResult">
+                查询结果将显示在这里...
+            </div>
+        </div>
+
+        <div class="mt-5">
+            <h2 class="mb-4">
+                API 使用说明
+                <button class="btn btn-link text-decoration-none text-dark p-0" type="button" data-bs-toggle="collapse" data-bs-target="#apiDocs" aria-expanded="false" aria-controls="apiDocs">
+                    展开/折叠
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-chevron-down ms-2" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+                    </svg>
+                </button>
+            </h2>
+            
+            <div class="collapse" id="apiDocs">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3 class="h5 mb-0">获取客户端 IP</h3>
+                    </div>
+                    <div class="card-body">
+                        <h4 class="h6">请求</h4>
+                        <pre><code>GET /api/ip</code></pre>
+                        
+                        <h4 class="h6 mt-3">响应示例</h4>
+                        <pre><code>{
+    "ip": "1.2.3.4"
+}</code></pre>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3 class="h5 mb-0">DNS 查询</h3>
+                    </div>
+                    <div class="card-body">
+                        <h4 class="h6">请求</h4>
+                        <pre><code>GET /api/resolve?name={domain}&type={record_type}&edns_client_subnet={subnet}</code></pre>
+                        
+                        <h4 class="h6 mt-3">参数说明</h4>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>参数</th>
+                                    <th>类型</th>
+                                    <th>必填</th>
+                                    <th>说明</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>name</td>
+                                    <td>string</td>
+                                    <td>是</td>
+                                    <td>要查询的域名</td>
+                                </tr>
+                                <tr>
+                                    <td>type</td>
+                                    <td>string</td>
+                                    <td>否</td>
+                                    <td>记录类型（A, AAAA, CNAME 等），默认为 A</td>
+                                </tr>
+                                <tr>
+                                    <td>edns_client_subnet</td>
+                                    <td>string</td>
+                                    <td>否</td>
+                                    <td>EDNS 客户端子网，格式：IP/掩码长度</td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <h4 class="h6 mt-3">响应示例</h4>
+                        <pre><code>{
+    "Status": 0,
+    "TC": false,
+    "RD": true,
+    "RA": true,
+    "AD": false,
+    "CD": false,
+    "Question": [
+        {
+            "name": "example.com",
+            "type": 1
+        }
+    ],
+    "Answer": [
+        {
+            "name": "example.com",
+            "type": 1,
+            "TTL": 300,
+            "data": "93.184.216.34"
+        }
+    ],
+    "edns_client_subnet": "1.2.3.4/24"
+}</code></pre>
+
+                        <h4 class="h6 mt-3">状态码说明</h4>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>状态码</th>
+                                    <th>说明</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>0</td>
+                                    <td>NOERROR - 查询成功</td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td>SERVFAIL - 服务器失败</td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td>NXDOMAIN - 域名不存在</td>
+                                </tr>
+                                <tr>
+                                    <td>5</td>
+                                    <td>REFUSED - 查询被拒绝</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="h5 mb-0">使用示例</h3>
+                    </div>
+                    <div class="card-body">
+                        <h4 class="h6">cURL</h4>
+                        <pre><code>curl "http://example.com/api/resolve?name=example.com&type=A&edns_client_subnet=1.2.3.4/24"</code></pre>
+
+                        <h4 class="h6 mt-3">JavaScript</h4>
+                        <pre><code>fetch('/api/resolve?name=example.com&type=A&edns_client_subnet=1.2.3.4/24')
+    .then(response => response.json())
+    .then(data => console.log(data));</code></pre>
+
+                        <h4 class="h6 mt-3">Python</h4>
+                        <pre><code>import requests
+
+response = requests.get(
+    'http://example.com/api/resolve',
+    params={
+        'name': 'example.com',
+        'type': 'A',
+        'edns_client_subnet': '1.2.3.4/24'
+    }
+)
+data = response.json()</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="container text-center text-muted py-3 mt-5 border-top">
+        <small>
+            <a href="https://yxvm.com" target="_blank" class="text-decoration-none">YxVM</a> 赞助服务器
+            · 
+            <a href="https://github.com/chenx-dust/dns-lookup" target="_blank" class="text-decoration-none">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-github" viewBox="0 0 16 16">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.012 8.012 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+                </svg>
+                GitHub
+            </a>
+            ·
+            <a href="https://github.com/chenx-dust/dns-lookup/blob/main/LICENSE" target="_blank" class="text-decoration-none">
+                MIT License
+            </a>
+        </small>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

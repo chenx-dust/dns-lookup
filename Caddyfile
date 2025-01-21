@@ -1,0 +1,37 @@
+example.com {
+    # 启用 PROXY 协议
+    servers {
+        protocol {
+            experimental_http3
+            allow_h2c
+        }
+    }
+
+    # 反向代理配置
+    reverse_proxy app:8000 {
+        # 启用 PROXY 协议
+        transport http {
+            proxy_protocol
+        }
+        
+        # 设置请求头
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # 启用压缩
+    encode gzip
+
+    # 日志配置
+    log {
+        output file /var/log/caddy/example.com.log
+        format json
+    }
+
+    # TLS 配置（Caddy 会自动处理证书）
+    tls {
+        protocols tls1.2 tls1.3
+    }
+} 

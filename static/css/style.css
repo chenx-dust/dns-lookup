@@ -1,0 +1,121 @@
+.container {
+    max-width: 800px;
+    margin-top: 2rem;
+}
+
+.result-area {
+    min-height: 200px;
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 4px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.result-header {
+    background-color: #e9ecef;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.result-header p {
+    margin: 5px 0;
+}
+
+.dns-record {
+    background-color: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.dns-record-header {
+    background-color: #f1f3f5;
+    padding: 5px 10px;
+    margin: -10px -10px 10px -10px;
+    border-radius: 4px 4px 0 0;
+    font-weight: bold;
+}
+
+.dns-record-content {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 8px;
+    align-items: baseline;
+}
+
+.dns-record-label {
+    color: #666;
+    font-weight: 500;
+    text-align: right;
+    padding-right: 10px;
+}
+
+.dns-record-value {
+    color: #212529;
+}
+
+.section-title {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin: 15px 0 10px 0;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* API 文档折叠按钮样式 */
+.btn-link:hover {
+    opacity: 0.8;
+}
+
+.btn-link:focus {
+    box-shadow: none;
+}
+
+.btn-link[aria-expanded="true"] .bi-chevron-down {
+    transform: rotate(180deg);
+    transition: transform 0.2s ease-in-out;
+}
+
+.btn-link[aria-expanded="false"] .bi-chevron-down {
+    transform: rotate(0deg);
+    transition: transform 0.2s ease-in-out;
+}
+
+/* 折叠动画 */
+.collapse {
+    transition: all 0.2s ease-in-out;
+}
+
+.collapse.show {
+    transition: all 0.2s ease-in-out;
+}
+
+/* 页脚样式 */
+footer {
+    margin-top: 3rem !important;
+}
+
+footer a {
+    color: #6c757d;
+    transition: color 0.2s ease-in-out;
+}
+
+footer a:hover {
+    color: #343a40;
+}
+
+footer .bi-github {
+    margin-bottom: 2px;
+    margin-right: 2px;
+}
+
+footer small {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
