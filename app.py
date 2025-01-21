@@ -11,7 +11,9 @@ import requests
 from typing import Optional
 import os
 
+# 创建主应用和 API 子应用
 app = FastAPI()
+api_app = FastAPI()
 
 # 配置 CORS
 app.add_middleware(
@@ -27,13 +29,6 @@ app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["*"]  # 在生产环境中应该设置具体的域名
 )
-
-# 获取当前目录
-current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# 挂载静态文件
-app.mount("/static", StaticFiles(directory=os.path.join(current_dir, "static")), name="static")
-app.mount("/", StaticFiles(directory=current_dir, html=True), name="root")
 
 class DNSResponse(BaseModel):
     Status: int = 0
@@ -72,12 +67,12 @@ def get_client_ip(request: Request = None):
     except Exception as e:
         return str(e)
 
-@app.get("/ip")
+@api_app.get("/ip")
 async def get_ip(request: Request):
     ip = get_client_ip(request)
     return {"ip": ip}
 
-@app.get("/resolve")
+@api_app.get("/resolve")
 async def resolve_dns(name: str, type: str = "A", edns_client_subnet: str = None):
     try:
         # 创建解析器
@@ -95,6 +90,26 @@ async def resolve_dns(name: str, type: str = "A", edns_client_subnet: str = None
             rdtype = dns.rdatatype.from_text(rdtype)
         except Exception:
             raise HTTPException(status_code=400, detail=f"Invalid record type: {type}")
+
+        # 处理 ECS
+        if edns_client_subnet and edns_client_subnet.lower() != "undefined":
+            try:
+                # 验证 ECS 格式
+                if '/' not in edns_client_subnet:
+                    edns_client_subnet = f"{edns_client_subnet}/24"
+                ip, mask = edns_client_subnet.split('/')
+                # TODO: 这里可以添加更多的 IP 格式验证
+            except Exception:
+                raise HTTPException(status_code=400, detail=f"Invalid ECS format: {edns_client_subnet}")
+            
+            # 设置 EDNS 选项
+            options = []
+            from dns.edns import ECSOption
+            try:
+                options.append(ECSOption.from_text(edns_client_subnet))
+                resolver.use_edns(0, options=options)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Invalid ECS: {str(e)}")
 
         # 执行查询
         try:
@@ -136,14 +151,22 @@ async def resolve_dns(name: str, type: str = "A", edns_client_subnet: str = None
                 "data": str(rdata)
             })
 
-        # 如果提供了 ECS，添加到响应中
-        if edns_client_subnet:
+        # 如果提供了有效的 ECS，添加到响应中
+        if edns_client_subnet and edns_client_subnet.lower() != "undefined":
             response.edns_client_subnet = edns_client_subnet
 
         return response
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# 获取当前目录
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# 挂载 API 子应用和静态文件
+app.mount("/api", api_app)
+app.mount("/static", StaticFiles(directory=os.path.join(current_dir, "static")), name="static")
+app.mount("/", StaticFiles(directory=current_dir, html=True), name="root")
 
 if __name__ == "__main__":
     import uvicorn
